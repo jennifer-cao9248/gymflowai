@@ -24,7 +24,7 @@ function MembersContent() {
       if (membersError) {
         setError(membersError.message);
       } else {
-        setMembers(data ?? []);
+        setMembers((data as MemberRow[]) ?? []);
       }
       setLoading(false);
     }
@@ -44,7 +44,8 @@ function MembersContent() {
     setError("");
 
     const supabase = createSupabaseBrowserClient();
-    const { data, error: insertError } = await supabase.from("members").insert({ name }).select("*").single();
+    const { data: insertData, error: insertError } = await supabase.from("members").insert({ name }).select("*").single();
+    const data = (insertData as MemberRow | null) ?? null;
 
     if (insertError) {
       setError(insertError.message);

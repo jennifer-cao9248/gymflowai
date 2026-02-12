@@ -35,13 +35,13 @@ function NewSessionContent() {
       if (membersResult.error) {
         setError(membersResult.error.message);
       } else {
-        setMembers(membersResult.data ?? []);
+        setMembers((membersResult.data as MemberRow[]) ?? []);
       }
 
       if (exercisesResult.error) {
         setError(exercisesResult.error.message);
       } else {
-        setExercises(exercisesResult.data ?? []);
+        setExercises((exercisesResult.data as ExerciseRow[]) ?? []);
       }
 
       setLoading(false);
@@ -91,7 +91,7 @@ function NewSessionContent() {
     }
 
     const supabase = createSupabaseBrowserClient();
-    const { data, error: insertError } = await supabase
+    const { data: insertData, error: insertError } = await supabase
       .from("exercises")
       .insert({
         name,
@@ -99,6 +99,7 @@ function NewSessionContent() {
       })
       .select("*")
       .single();
+    const data = (insertData as ExerciseRow | null) ?? null;
 
     if (insertError) {
       setError(insertError.message);
@@ -132,7 +133,7 @@ function NewSessionContent() {
     setCreating(true);
 
     const supabase = createSupabaseBrowserClient();
-    const { data: sessionData, error: sessionError } = await supabase
+    const { data: createdSessionData, error: sessionError } = await supabase
       .from("sessions")
       .insert({
         member_id: selectedMemberId,
@@ -141,6 +142,7 @@ function NewSessionContent() {
       })
       .select("id")
       .single();
+    const sessionData = (createdSessionData as { id: string } | null) ?? null;
 
     if (sessionError || !sessionData) {
       setError(sessionError?.message ?? "Could not create session.");

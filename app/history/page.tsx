@@ -83,16 +83,12 @@ function HistoryContent() {
       if (resultsResult.error) {
         setError(resultsResult.error.message);
       } else {
-        setResults(resultsResult.data ?? []);
+        setResults((resultsResult.data as SetResultRow[]) ?? []);
       }
     }
 
     if (selectedSessionId) {
       void loadDetail(selectedSessionId);
-    } else {
-      setSelectedSession(null);
-      setPlanned([]);
-      setResults([]);
     }
   }, [selectedSessionId]);
 

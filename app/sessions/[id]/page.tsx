@@ -27,6 +27,22 @@ type CapturedResult = {
   unit: "lb" | "kg";
 };
 
+type SpeechRecognitionLikeEvent = {
+  results: ArrayLike<ArrayLike<{ transcript: string }>>;
+};
+
+type SpeechRecognitionLike = {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onresult: ((event: SpeechRecognitionLikeEvent) => void) | null;
+  onerror: (() => void) | null;
+  onnomatch: (() => void) | null;
+  start: () => void;
+};
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
 function parseVoiceTranscript(transcript: string): CapturedResult | null {
   const normalized = transcript.toLowerCase();
   const numbers = normalized.match(/\d+(?:\.\d+)?/g) ?? [];
@@ -35,12 +51,17 @@ function parseVoiceTranscript(transcript: string): CapturedResult | null {
     return null;
   }
 
-  const reps = Number.parseInt(numbers[0], 10);
+  const [repsToken, weightToken] = numbers;
+  if (!repsToken) {
+    return null;
+  }
+
+  const reps = Number.parseInt(repsToken, 10);
   if (!Number.isFinite(reps) || reps <= 0) {
     return null;
   }
 
-  const weight = numbers.length > 1 ? Number.parseFloat(numbers[1]) : null;
+  const weight = weightToken ? Number.parseFloat(weightToken) : null;
   const unit = normalized.includes("kg") ? "kg" : "lb";
 
   return { reps, weight, unit };
@@ -67,9 +88,12 @@ function promptForManualResult(): CapturedResult | null {
 }
 
 async function captureResultFromVoice(): Promise<CapturedResult | null> {
-  const speechApi =
-    (window as Window & { webkitSpeechRecognition?: new () => any; SpeechRecognition?: new () => any }).SpeechRecognition ??
-    (window as Window & { webkitSpeechRecognition?: new () => any }).webkitSpeechRecognition;
+  const speechWindow = window as Window & {
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+    SpeechRecognition?: SpeechRecognitionConstructor;
+  };
+
+  const speechApi = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
 
   if (!speechApi) {
     return promptForManualResult();
@@ -81,7 +105,7 @@ async function captureResultFromVoice(): Promise<CapturedResult | null> {
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: SpeechRecognitionLikeEvent) => {
       const transcript = event.results?.[0]?.[0]?.transcript ?? "";
       const parsed = parseVoiceTranscript(transcript);
       if (parsed) {
@@ -139,7 +163,7 @@ function SessionDetailsContent() {
       if (resultsResult.error) {
         setError(resultsResult.error.message);
       } else {
-        setResults(resultsResult.data ?? []);
+        setResults((resultsResult.data as SetResultRow[]) ?? []);
       }
 
       setLoading(false);
@@ -174,7 +198,7 @@ function SessionDetailsContent() {
     const setNumber = currentSetNumber + 1;
 
     const supabase = createSupabaseBrowserClient();
-    const { data, error: insertError } = await supabase
+    const { data: insertedData, error: insertError } = await supabase
       .from("set_results")
       .insert({
         session_id: sessionId,
@@ -186,6 +210,7 @@ function SessionDetailsContent() {
       })
       .select("*")
       .single();
+    const data = (insertedData as SetResultRow | null) ?? null;
 
     if (insertError) {
       setError(insertError.message);
